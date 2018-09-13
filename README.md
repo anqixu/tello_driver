@@ -1,2 +1,7 @@
 # tello_driver
-ROS driver for DJI/Ryze Tello drones
+ROS driver wrapper for DJI/Ryze Tello drone
+
+TODO: Work-in-Progress
+
+## Installation
+* rosdep install tello_driver

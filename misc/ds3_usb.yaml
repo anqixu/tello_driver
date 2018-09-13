@@ -1,0 +1,68 @@
+# Configuration file for joy_teleop
+#
+# SONY DualShock3 gamepad connected to USB
+
+# Deadman (enable) button: R2
+teleop:
+  piloting:
+    type: topic
+    message_type: "geometry_msgs/Twist"
+    topic_name: cmd_vel
+    deadman_buttons: [7]
+    axis_mappings:
+      -
+        axis: 4  # RY
+        target: linear.x
+        scale: 1.0
+        offset: 0.0
+      -
+        axis: 3  # RX
+        target: linear.y
+        scale: 1.0
+        offset: 0.0
+      -
+        axis: 1  # LY
+        target: linear.z
+        scale: 1.0
+        offset: 0.0
+      -
+        axis: 0  # LX
+        target: angular.z
+        scale: 1.0
+        offset: 0.0
+  takeoff:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: takeoff
+    deadman_buttons: [2, 7]  # R2 + TRIANGLE
+    axis_mappings: []
+  land:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: land
+    deadman_buttons: [0, 7]  # R2 + X
+    axis_mappings: []
+  emergency:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: reset
+    deadman_buttons: [1, 7] # R2 + CIRCLE
+    axis_mappings: []
+  flattrim:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: flattrim
+    deadman_buttons: [3, 7] # R2 + SQUARE
+    axis_mappings: []
+  flip:
+    type: topic
+    message_type: "std_msgs/UInt8"
+    topic_name: flip
+    deadman_buttons: [6, 7, 3] # R2 + L2 + SQUARE
+    axis_mappings: []
+  snapshot:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: snapshot
+    deadman_buttons: [7, 4] # R2 + L1
+    axis_mappings: []

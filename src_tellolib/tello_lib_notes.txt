@@ -1,0 +1,133 @@
+enum ConnectionState:
+    Disconnected, *
+    Connecting,
+    Connected,
+    Paused,//used to keep from disconnecting when starved for input.
+    UnPausing//Transition. Never stays in this state. 
+
+each packet needs seq # and CRC
+- sequence # starts at 0/1?
+- seq little endian [7-8]
+- CRC: CRC.calcUCRC(packet, 4):
+         - bytes[3] = uCRC(bytes[0:2], poly=119)
+         > extra tiny CRC for start byte and opcode
+       CRC.calcCrc(packet, packet.Length):
+         - short little endian bytes[-2:-1] = fsc16(bytes[:-2], poly=13970)
+         > frame check sequence
+
+- joystick packet: 0xcc, 0xb0, 0x00, 0x7f, 0x60, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x16, 0x01, 0x0e, 0x00, 0x25, 0x54
+            short axis1 = (short)(660.0F * fRx + 1024.0F);//RightX center=1024 left =364 right =-364
+            short axis2 = (short)(660.0F * fRy + 1024.0F);//RightY down =364 up =-364
+            short axis3 = (short)(660.0F * fLy + 1024.0F);//LeftY down =364 up =-364
+            short axis4 = (short)(660.0F * fLx + 1024.0F);//LeftX left =364 right =-364
+            short axis5 = (short)(660.0F * speed + 1024.0F);//Speed. 
+            if (speed > 0.1f)
+                axis5 = 0x7fff;
+            long packedAxis = ((long)axis1 & 0x7FF) | (((long)axis2 & 0x7FF) << 11) | ((0x7FF & (long)axis3) << 22) | ((0x7FF & (long)axis4) << 33) | ((long)axis5 << 44);
+            packet[9] = ((byte)(int)(0xFF & packedAxis));
+            packet[10] = ((byte)(int)(packedAxis >> 8 & 0xFF));
+            packet[11] = ((byte)(int)(packedAxis >> 16 & 0xFF));
+            packet[12] = ((byte)(int)(packedAxis >> 24 & 0xFF));
+            packet[13] = ((byte)(int)(packedAxis >> 32 & 0xFF));
+            packet[14] = ((byte)(int)(packedAxis >> 40 & 0xFF));
+            var now = DateTime.Now;
+            packet[15] = (byte)now.Hour;
+            packet[16] = (byte)now.Minute;
+            packet[17] = (byte)now.Second;
+            packet[18] = (byte)(now.Millisecond & 0xff);
+            packet[19] = (byte)(now.Millisecond >> 8);
+            CRC.calcUCRC(packet, 4);//Not really needed.
+            CRC.calcCrc(packet, packet.Length);
+- takeoff: 0xcc, 0x58, 0x00, 0x7c, 0x68, 0x54, 0x00, 0xe4, 0x01, 0xc2, 0x16
+- throw takeoff: 0xcc, 0x58, 0x00, 0x7c, 0x48, 0x5d, 0x00, 0xe4, 0x01, 0xc2, 0x16
+- land (unknown [9]=0x00): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x55, 0x00, 0xe5, 0x01, 0x00, 0xba, 0xc7
+- req iframe (no seq or CRC): 0xcc, 0x58, 0x00, 0x7c, 0x60, 0x25, 0x00, 0x00, 0x00, 0x6c, 0x95
+- set max height (short height_meters [9]=lo,[10]=hi): 0xcc, 0x68, 0x00, 0x27, 0x68, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, 0xc5
+- query unk (wtf?; byte cmd=[5]): 0xcc, 0x58, 0x00, 0x7c, 0x48, 0xff, 0x00, 0x06, 0x00, 0xe9, 0xb3
+- query att angle: 0xcc, 0x58, 0x00, 0x7c, 0x48, 0x59, 0x10, 0x06, 0x00, 0xe9, 0xb3
+- query max height: 0xcc, 0x58, 0x00, 0x7c, 0x48, 0x56, 0x10, 0x06, 0x00, 0xe9, 0xb3
+- set att angle (float ang in [9-12], not sure deg, not sure little end): 0xcc, 0x78, 0x00, 0x27, 0x68, 0x58, 0x10, 0x00, 0x00, 0x00, 0x00,0x00, 0x00, 0x5b, 0xc5
+  - should query att angle after
+- set eis (electronic image stabilization?) (byte value=[9]): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x24, 0x00, 0x09, 0x00, 0x00, 0x5b, 0xc5
+- do flip (byte dir=[9]): 0xcc, 0x60, 0x00, 0x27, 0x70, 0x5c, 0x00, 0x09, 0x00, 0x00, 0x5b, 0xc5
+- set jpg quality (byte quality=[9], suspect percent): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x37, 0x00, 0x09, 0x00, 0x00, 0x5b, 0xc5
+- set exposure (byte ev in -9:9, =[9]): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x34, 0x00, 0x09, 0x00, 0x00, 0x5b, 0xc5
+- set video fixed bitrate (byte rate[9]): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x20, 0x00, 0x09, 0x00, 0x00, 0x5b, 0xc5
+- set video dyn bitrate (byte rate[9]): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x21, 0x00, 0x09, 0x00, 0x00, 0x5b, 0xc5
+- set video record (byte n=[9], means enable?): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x32, 0x00, 0x09, 0x00, 0x00, 0x5b, 0xc5
+- set picture or video mode (byte mode, 1=vid, 0=photo, [9]): 0xcc, 0x60, 0x00, 0x27, 0x68, 0x31, 0x00, 0x00, 0x00, 0x00, 0x5b, 0xc5
+- take picture: 0xcc, 0x58, 0x00, 0x7c, 0x68, 0x30, 0x00, 0x06, 0x00, 0xe9, 0xb3
+- send ack file piece: 0xcc, 0x90, 0x00, 0x27, 0x50, 0x63, 0x00, 0xf0, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, 0xc5
+  - byte endFlag [9]
+  - short fieldID [10]=lo, [11]=hi
+  - int pieceId: [12-15] little endian
+- send ack file size (seems like just a cmd ack): 0xcc, 0x60, 0x00, 0x27, 0x50, 0x62, 0x00, 0x00, 0x00, 0x00, 0x5b, 0xc5
+- send ack file done (int size little endian [11-14]): 0xcc, 0x88, 0x00, 0x24, 0x48, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, 0xc5
+- send ack log (not sure what log means; short cmd [5-6], short id=[10-11]): 0xcc, 0x70, 0x00, 0x27, 0x50, 0x50, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, 0xc5
+- send ack log config (short cmd [5-6], ushort id [10-11], int n2=[12-15]): 0xcc, 0xd0, 0x00, 0x27, 0x88, 0x50, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00,0x00, 0x00,0x00, 0x00, 0x5b, 0xc5
+
+- set(): very complicated parsing, suspect state telemetry
+- parseLog(): also seems to be of drone log stream, suspect odom telemetry
+
+
+connect:
+  - 192.168.10.1:8889
+  - set state to Connecting
+  - handshake: Encoding.UTF8.GetBytes("conn_req:\x00\x00")
+            connectPacket[connectPacket.Length - 2] = 0x96
+            connectPacket[connectPacket.Length - 1] = 0x17
+
+startConnecting (lib-internal loop):
+  - 3 second connection timeout
+  - if disconnected: connect(), and startListener()
+  - if connecting or connected: if time elapsed, disconnect()
+
+disconnect:
+- remove socket listeners, change connection state to Disconnected
+
+start heartbeat:
+  - in loop
+  - if cancellation requested: break loop
+  - if connected: sencControllerUpdate(), tick++, every N tick = requestIFrame()
+  - sleep 50 ms?
+  - exceptions: might have "Access denied", suspect coming from lib and not drone
+
+udp listener loop:
+  - while True:
+    - if cancellation requested: break looop
+    - wait for UDP receive
+    - if connecting and msg = conn_ack (something):
+      set to Connected
+      start heart beat
+      request iframe
+      continue
+    - cmdID = bytes[5]=lo bytes[6]=hi
+    - cmd >= 74 and cmd < 80: XXXXXXXXCMD, not sure what, but ignored by lib
+    - cmd == 86: parse state, starting from 9th byte
+    - cmd == 4176: log header: short id=[9-10], sendAckLog(cmd, id)
+    - cmd == 4177: parseLog starting from byte 10
+    - cmd == 4178: log config: TelloLib claims not to be working
+    - cmd == 4185: att angle response. parse [10-13] -> angle
+    - cmd == 4182: max height response: TODO
+    - cmd == 26: wifi str command, signal strength = [9]
+    - cmd == 53: light str command: ignored
+    - cmd == 98: start jpeg:
+      - byte ftype = [9]
+      - uint32 num_bytes = [10-13]
+      - picChunkState = new bool[(picBytesExpected/1024)+1]; //calc based on size. 
+        picPieceState = new bool[(picChunkState.Length / 8)+1];
+      - sendAckFileSize()
+    - cmd == 99: jpg packet, see code
+    - cmd == 100: ???
+
+video server: UDP listener loop on 6038 (not 192.168.10.2:6038?)
+  - wait for frame with sign [2-4]==0, [5]=1 ("first NAL")
+  - nal = byte[6] & 0x1f
+  - from this pt onward, onVideoData(bytes)
+
+
+
+picture buffer: 3000*1024 bytes, maybe need larger
+
+
+find where the orig protocol came from, and implement missing features
