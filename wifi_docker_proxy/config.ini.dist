@@ -1,0 +1,8 @@
+[Setup]
+image_name=wifiproxy
+
+[Session]
+; may be updated by go.py
+container_name=proxy1
+wifi_dev=wlan1
+drone_ap=TELLO-C62D82
