@@ -25,4 +25,4 @@ Solution:
 * turn on drone
 * configure docker container to connect to drone and relayUDP: `$ go connect`
 * ...
-* teardown: `$go stop`
+* teardown: `$ go stop`
