@@ -1,13 +1,47 @@
 #!/usr/bin/env python2
 import rospy
 from std_msgs.msg import Empty, UInt8, Bool
+from std_msgs.msg import UInt8MultiArray
+from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from dynamic_reconfigure.server import Server
 from tello_driver.msg import TelloStatus
 from tello_driver.cfg import TelloConfig
+from cv_bridge import CvBridge, CvBridgeError
 
-import tello
+import av
+import math
+import numpy as np
+import threading
+from tellopy._internal import tello
+from tellopy._internal import protocol
+from tellopy._internal import logger
+
+
+class RospyLogger(logger.Logger):
+    def __init__(self, header=''):
+        super(RospyLogger, self).__init__(header)
+
+    def error(self, s):
+        if self.log_level < logger.LOG_ERROR:
+            return
+        rospy.logerr(s)
+
+    def warn(self, s):
+        if self.log_level < logger.LOG_WARN:
+            return
+        rospy.logwarn(s)
+
+    def info(self, s):
+        if self.log_level < logger.LOG_INFO:
+            return
+        rospy.loginfo(s)
+
+    def debug(self, s):
+        if self.log_level < logger.LOG_DEBUG:
+            return
+        rospy.logdebug(s)
 
 
 def notify_cmd_success(cmd, success):
@@ -21,9 +55,19 @@ class TelloNode(tello.Tello):
     def __init__(self):
         self.tello_ip = rospy.get_param('~tello_ip', '192.168.10.1')
         self.tello_cmd_port = int(rospy.get_param('~tello_cmd_port', 8889))
+        self.connect_timeout_sec = float(
+            rospy.get_param('~connect_timeout_sec', 10.0))
+        self.bridge = CvBridge()
 
         # Connect to drone
-        super(TelloNode, self).__init__(self.tello_ip, self.tello_cmd_port)
+        log = RospyLogger('Tello')
+        log.set_level(self.LOG_WARN)
+        super(TelloNode, self).__init__(
+            tello_ip=self.tello_ip,
+            tello_cmd_port=self.tello_cmd_port,
+            log=log)
+        self.connect()
+        self.wait_for_connection(timeout=self.connect_timeout_sec)
         rospy.loginfo('Connected to drone')
         rospy.on_shutdown(self.cb_shutdown)
 
@@ -35,78 +79,93 @@ class TelloNode(tello.Tello):
         # NOTE: ROS interface deliberately made to resemble bebop_autonomy
         self.pub_status = rospy.Publisher(
             'status', TelloStatus, queue_size=1, latch=True)
-        self.pub_odom = rospy.Publisher(
-            'odom', Odometry, queue_size=1, latch=True)
+        self.pub_image_raw = rospy.Publisher('image_raw', Image, queue_size=10)
 
         self.sub_takeoff = rospy.Subscriber('takeoff', Empty, self.cb_takeoff)
         self.sub_throw_takeoff = rospy.Subscriber(
             'throw_takeoff', Empty, self.cb_throw_takeoff)
         self.sub_land = rospy.Subscriber('land', Empty, self.cb_land)
-        self.sub_palm_land = rospy.Subscriber(
-            'palm_land', Empty, self.cb_palm_land)
         self.sub_flattrim = rospy.Subscriber(
             'flattrim', Empty, self.cb_flattrim)
         self.sub_flip = rospy.Subscriber('flip', UInt8, self.cb_flip)
         self.sub_cmd_vel = rospy.Subscriber('cmd_vel', Twist, self.cb_cmd_vel)
 
+        self.subscribe(self.EVENT_FLIGHT_DATA, self.cb_status_telem)
+        self.frame_thread = threading.Thread(target=self.framegrabber_loop)
+        self.frame_thread.start()
+
+        # NOTE: odometry from parsing logs might be possible eventually,
+        #       but it is unclear from tests what's being sent by Tello
+        # - https://github.com/Kragrathea/TelloLib/blob/master/TelloLib/Tello.cs#L1047
+        # - https://github.com/Kragrathea/TelloLib/blob/master/TelloLib/parsedRecSpecs.json
+        # self.pub_odom = rospy.Publisher(
+        #    'odom', UInt8MultiArray, queue_size=1, latch=True)
+        # self.pub_odom = rospy.Publisher(
+        #    'odom', Odometry, queue_size=1, latch=True)
+        #self.subscribe(self.EVENT_LOG, self.cb_odom_log)
+
         rospy.loginfo('Tello driver node ready')
 
     def cb_shutdown(self):
-        self.stop()
+        self.quit()
+        self.frame_thread.join()
 
-    def process_sensor_update(self, d):
+    def cb_status_telem(self, event, sender, data, **args):
+        speed_horizontal_mps = math.sqrt(
+            data.north_speed*data.north_speed+data.east_speed*data.east_speed)/10.
         msg = TelloStatus(
-            height_m=d['Height'],
-            speed_front_mps=d['NorthSpeed'],
-            speed_lateral_mps=d['EastSpeed'],
-            speed_planar_mps=d['HorizontalSpeed'],
-            speed_vertical_mps=d['VerticalSpeed'],
-            flight_time_sec=d['FlyTime'],
-            imu_state=d['IMUState'],
-            pressure_state=d['PressureState'],
-            down_visual_state=d['DownVisualState'],
-            power_state=d['PowerState'],
-            battery_state=d['BatteryState'],
-            gravity_state=d['GravityState'],
-            wind_state=d['WindState'],
-            imu_calibration_state=d['IMUCalibrationState'],
-            battery_percentage=d['BatteryPercentage'],
-            drone_fly_time_left_sec=d['DroneFlyTimeLeft'],
-            drone_battery_left_sec=d['DroneBatteryLeft'],
-            is_flying=d['IsFlying'],
-            is_on_ground=d['IsOnGround'],
-            is_em_open=d['IsEmOpen'],
-            is_drone_hover=d['IsDroneHover'],
-            is_outage_recording=d['IsOutageRecording'],
-            is_battery_low=d['IsBatteryLow'],
-            is_battery_lower=d['IsBatteryLower'],
-            is_factory_mode=d['IsFactoryMode'],
-            fly_mode=d['FlyMode'],
-            throw_takeoff_timer_sec=d['ThrowFlyTimer'],
-            camera_state=d['CameraState'],
-            electrical_machinery_state=d['ElectricalMachineryState'],
-            front_in=d['FrontIn'],
-            front_out=d['FrontOut'],
-            front_lsc=d['FrontLSC'],
-            temperature_height_m=d['TemperatureHeight'],
+            height_m=data.height/10.,
+            speed_northing_mps=data.north_speed/10.,
+            speed_easting_mps=data.east_speed/10.,
+            speed_horizontal_mps=speed_horizontal_mps,
+            speed_vertical_mps=-data.vertical_speed/10.,
+            flight_time_sec=data.fly_time/10.,
+            imu_state=data.imu_state,
+            pressure_state=data.pressure_state,
+            down_visual_state=data.down_visual_state,
+            power_state=data.power_state,
+            battery_state=data.battery_state,
+            gravity_state=data.gravity_state,
+            wind_state=data.wind_state,
+            imu_calibration_state=data.imu_calibration_state,
+            battery_percentage=data.battery_percentage,
+            drone_fly_time_left_sec=data.drone_fly_time_left,
+            drone_battery_left_sec=data.drone_battery_left,
+            is_flying=data.em_sky,
+            is_on_ground=data.em_ground,
+            is_em_open=data.em_open,
+            is_drone_hover=data.drone_hover,
+            is_outage_recording=data.outage_recording,
+            is_battery_low=data.battery_low,
+            is_battery_lower=data.battery_lower,
+            is_factory_mode=data.factory_mode,
+            fly_mode=data.fly_mode,
+            throw_takeoff_timer_sec=data.throw_fly_timer,
+            camera_state=data.camera_state,
+            electrical_machinery_state=data.electrical_machinery_state,
+            front_in=data.front_in,
+            front_out=data.front_out,
+            front_lsc=data.front_lsc,
+            temperature_height_m=data.temperature_height,
         )
         self.pub_status.publish(msg)
 
-    def todo_cb_odom(self, msg):
-        odom_msg = Odometry()
-        odom_msg.child_frame_id = 'Tello'
-        odom_msg.pose.pose.position.x = sensor_obj.pos_x
-        odom_msg.pose.pose.position.y = sensor_obj.pos_y
-        odom_msg.pose.pose.position.z = sensor_obj.pos_z
-        odom_msg.pose.pose.orientation.w = sensor_obj.quaternion_w
-        odom_msg.pose.pose.orientation.x = sensor_obj.quaternion_x
-        odom_msg.pose.pose.orientation.y = sensor_obj.quaternion_y
-        odom_msg.pose.pose.orientation.z = sensor_obj.quaternion_z
-        odom_msg.twist.twist.linear.x = sensor_obj.speed_x
-        odom_msg.twist.twist.linear.y = sensor_obj.speed_y
-        odom_msg.twist.twist.linear.z = sensor_obj.speed_z
-
+    def cb_odom_log(self, event, sender, data, **args):
+        odom_msg = UInt8MultiArray()
+        odom_msg.data = str(data)
         self.pub_odom.publish(odom_msg)
+
+    def framegrabber_loop(self):
+        vs = self.get_video_stream()
+        container = av.open(vs)
+        for frame in container.decode(video=0):  # vs blocks, dies on self.stop
+            img = np.array(frame.to_image())
+            try:
+                msg = self.bridge.cv2_to_imgmsg(img, 'rgb8')
+            except CvBridgeError as e:
+                rospy.logerr(str(e))
+                continue
+            self.pub_image_raw.publish(msg)
 
     def cb_dyncfg(self, config, level):
         update_all = False
@@ -117,11 +176,14 @@ class TelloNode(tello.Tello):
         return self.cfg
 
     def cb_takeoff(self, msg):
-        success = self.takeOff()
+        success = self.takeoff()
         notify_cmd_success('Takeoff', success)
 
     def cb_throw_takeoff(self, msg):
-        success = self.throwTakeoff()
+        THROW_TAKEOFF_CMD = 0x005d
+        pkt = protocol.Packet(THROW_TAKEOFF_CMD, pkt_type=0x48)
+        pkt.fixup()
+        success = self.send_packet(pkt)
         if success:
             rospy.loginfo('Drone set to auto-takeoff when thrown')
         else:
@@ -131,28 +193,30 @@ class TelloNode(tello.Tello):
         success = self.land()
         notify_cmd_success('Land', success)
 
-    def cb_palm_land(self, msg):
-        success = self.palmLand()
-        notify_cmd_success('PalmLand', success)
-
     def cb_flattrim(self, msg):
-        success = self.flattrim()
+        PLANE_CALIBRATION_CMD = 4180
+        pkt = protocol.Packet(PLANE_CALIBRATION_CMD)
+        pkt.fixup()
+        success = self.send_packet(pkt)
         notify_cmd_success('FlatTrim', success)
 
     def cb_flip(self, msg):
         if msg.data < 0 or msg.data > 7:
             rospy.logwarn('Invalid flip direction: %d' % msg.data)
             return
-        success = self.flip(msg.data)
+        pkt = protocol.Packet(protocol.FLIP_CMD, 0x70)
+        pkt.add_byte(int(msg.data))
+        pkt.fixup()
+        success = self.send_packet(pkt)
         notify_cmd_success('Flip', success)
 
     # WARNING: need to constantly send gamepad packets, or else props will stop even during takeoff
     def cb_cmd_vel(self, msg):
-        pitch = msg.linear.x
-        roll = msg.linear.y
-        yaw = msg.angular.z
-        vertical_movement = msg.linear.z
-        self.setCmdVel(roll, pitch, yaw, vertical_movement, self.cfg.fast_mode)
+        self.set_pitch(msg.linear.x)
+        self.set_roll(-msg.linear.y)
+        self.set_yaw(-msg.angular.z)
+        # NOTE: set_throttle actually controls vertical up/down
+        self.set_throttle(msg.linear.z)
 
 
 def main():

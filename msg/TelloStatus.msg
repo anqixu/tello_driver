@@ -1,11 +1,11 @@
-int16 height_m
+float32 height_m
 
-int16 speed_front_mps
-int16 speed_lateral_mps
-int16 speed_planar_mps
-int16 speed_vertical_mps
+float32 speed_northing_mps
+float32 speed_easting_mps
+float32 speed_horizontal_mps
+float32 speed_vertical_mps
 
-uint16 flight_time_sec
+float32 flight_time_sec
 
 bool imu_state
 bool pressure_state
@@ -33,7 +33,6 @@ uint8 fly_mode
 uint8 throw_takeoff_timer_sec
 uint8 camera_state
 
-# TODO: suspect this is related to overheating
 uint8 electrical_machinery_state
 
 bool front_in

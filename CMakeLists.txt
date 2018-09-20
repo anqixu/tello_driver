@@ -5,6 +5,7 @@ project(tello_driver)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  cv_bridge
   dynamic_reconfigure
   geometry_msgs
   message_generation
@@ -40,7 +41,7 @@ generate_dynamic_reconfigure_options(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS dynamic_reconfigure geometry_msgs message_runtime nav_msgs rospy sensor_msgs std_msgs
+  CATKIN_DEPENDS cv_bridge dynamic_reconfigure geometry_msgs message_runtime nav_msgs rospy sensor_msgs std_msgs
 #  DEPENDS system_lib
 )
 

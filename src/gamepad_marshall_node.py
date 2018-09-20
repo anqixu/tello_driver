@@ -101,13 +101,14 @@ class GamepadState:
 
 
 class GamepadMarshallNode:
+    MAX_FLIP_DIR = 7
+
     def __init__(self):
         # Define parameters
         self.joy_state_prev = GamepadState()
         # if None then not in agent mode, otherwise contains time of latest enable/ping
         self.agent_mode_t = None
-
-        self.flip_dir = 0  # TODO: remove after test
+        self.flip_dir = 0
 
         # Start ROS node
         rospy.init_node('gamepad_marshall_node')
@@ -148,28 +149,28 @@ class GamepadMarshallNode:
         # Process emergency stop
         if not self.joy_state_prev.B and self.joy_state.B:
             self.pub_reset.publish()
-            rospy.logwarn('Issued RESET')
+            #rospy.logwarn('Issued RESET')
             return
 
         # Process takeoff
         if not self.joy_state_prev.Start and self.joy_state.Start:
             self.pub_takeoff.publish()
-            rospy.logwarn('Issued TAKEOFF')
+            #rospy.logwarn('Issued TAKEOFF')
 
         # Process land
         if not self.joy_state_prev.Select and self.joy_state.Select:
             self.pub_land.publish()
-            rospy.logwarn('Issued LAND')
+            #rospy.logwarn('Issued LAND')
 
         if not self.joy_state_prev.X and self.joy_state.X:
             self.pub_flattrim.publish()
-            rospy.logwarn('Issued FLATTRIM')
+            #rospy.logwarn('Issued FLATTRIM')
 
         if not self.joy_state_prev.Y and self.joy_state.Y:
             self.pub_flip.publish(self.flip_dir)
-            rospy.logwarn('Issued FLIP %d' % self.flip_dir)
+            #rospy.logwarn('Issued FLIP %d' % self.flip_dir)
             self.flip_dir += 1
-            if self.flip_dir > 3:
+            if self.flip_dir > self.MAX_FLIP_DIR:
                 self.flip_dir = 0
 
         # Update agent bypass mode

@@ -11,7 +11,7 @@ class TelloDriver:
     def __init__(self, tello_ip='192.168.10.1', tello_port=8889):
         # Initialize state
         self.alive = False  # Set to False to terminate listeners
-        self.state = 0  # TODO: enum; 0=connecting, 1=connected
+        self.state = 0  # enum; 0=connecting, 1=connected
         self.udp = None
         self.listener_thread = None
 
@@ -21,7 +21,6 @@ class TelloDriver:
         self.udp.connect(tello_addr)
         self.alive = True
         self.state = 0
-        print('Socket connected')  # TODO: remove
 
         # Setup UDP listener loop
         self.listener_thread = threading.Thread(target=self._listener_loop)
@@ -37,8 +36,7 @@ class TelloDriver:
 
     def _listener_loop(self):
         while self.alive:
-            # TODO: determine how many packets typically received from Tello
-            data = self.udp.recv(1024)
+            data = self.udp.recv(2048)
             if not data:
                 print('! Got empty from recv: %s' % str(data))
                 self.alive = False
@@ -66,13 +64,11 @@ class TelloDriver:
 
             print('R> %4d, cmd=%d' % (len(data), cmd))
 
-            # TODO: parse state:     ! cmd == 86: parse state, starting from 9th byte
-
-
-R > 35, cmd = 86
-R > 13, cmd = 26
-R > 12, cmd = 53
-R > 270, cmd = 4176
+            # parse state:     ! cmd == 86: parse state, starting from 9th byte
+            # R > 35, cmd = 86
+            # R > 13, cmd = 26
+            # R > 12, cmd = 53
+            # R > 270, cmd = 4176
 
     def _send_conn_req(self):
         packet = bytearray('conn_req:\x96\x17')
@@ -103,7 +99,7 @@ R > 270, cmd = 4176
         if not self.alive:
             return
         packet = bytearray('\xcc\x60\x00\x27\x68\x55\x00\xe5\x01\x00\xba\xc7')
-        packet[9] = 0x00  # TODO: what is this flag?
+        packet[9] = 0x00  # what is this flag?
         self.udp.send(packet)
 
 

@@ -108,7 +108,7 @@ udp listener loop:
     - cmd == 4177: parseLog starting from byte 10
     - cmd == 4178: log config: TelloLib claims not to be working
     - cmd == 4185: att angle response. parse [10-13] -> angle
-    - cmd == 4182: max height response: TODO
+    - cmd == 4182: max height response: ...
     - cmd == 26: wifi str command, signal strength = [9]
     - cmd == 53: light str command: ignored
     - cmd == 98: start jpeg:
