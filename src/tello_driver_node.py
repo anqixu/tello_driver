@@ -124,9 +124,9 @@ class TelloNode(tello.Tello):
         speed_horizontal_mps = math.sqrt(
             data.north_speed*data.north_speed+data.east_speed*data.east_speed)/10.
 
-        # Anecdotally, observed that:
-        # + easting points to South
-        # + northing points to East
+        # NOTE: Anecdotally, observed that:
+        # data.east_speed points to South
+        # data.north_speed points to East
         msg = TelloStatus(
             height_m=data.height/10.,
             speed_northing_mps=-data.east_speed/10.,
