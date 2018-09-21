@@ -1,11 +1,16 @@
 <?xml version="1.0"?>
 <launch>
+    <arg name="tello_ip" default="192.168.10.1" />
+    <arg name="tello_cmd_port" default="8889" />
     <arg name="namespace" default="tello" />
-    <arg name="use_wifi" default="False" />
-    <arg name="bluetooth_addr" default="e0:14:ef:39:3d:d1" />
 
     <group ns="$(arg namespace)">
         <node pkg="tello_driver" name="tello" type="tello_driver_node.py" output="screen">
+            <param name="tello_ip" value="$(arg tello_ip)" />
+            <param name="tello_cmd_port" value="$(arg tello_cmd_port)" />
+            <param name="connect_timeout_sec" value="10.0" />
         </node>
+
+        <node pkg="image_transport" name="image_compressed" type="republish" args="raw in:=image_raw compressed out:=image_raw" />
     </group>
 </launch>

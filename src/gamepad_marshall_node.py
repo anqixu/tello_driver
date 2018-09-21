@@ -119,8 +119,12 @@ class GamepadMarshallNode:
 
         self.pub_takeoff = rospy.Publisher(
             'takeoff', Empty,  queue_size=1, latch=False)
+        self.pub_throw_takeoff = rospy.Publisher(
+            'throw_takeoff', Empty,  queue_size=1, latch=False)
         self.pub_land = rospy.Publisher(
             'land', Empty,  queue_size=1, latch=False)
+        self.pub_palm_land = rospy.Publisher(
+            'palm_land', Empty,  queue_size=1, latch=False)
         self.pub_reset = rospy.Publisher(
             'reset', Empty,  queue_size=1, latch=False)
         self.pub_flattrim = rospy.Publisher(
@@ -157,10 +161,20 @@ class GamepadMarshallNode:
             self.pub_takeoff.publish()
             #rospy.logwarn('Issued TAKEOFF')
 
+        # Process throw takeoff
+        if not self.joy_state_prev.DU and self.joy_state.DU:
+            self.pub_throw_takeoff.publish()
+            #rospy.logwarn('Issued THROW_TAKEOFF')
+
         # Process land
         if not self.joy_state_prev.Select and self.joy_state.Select:
             self.pub_land.publish()
             #rospy.logwarn('Issued LAND')
+
+        # Process palm land
+        if not self.joy_state_prev.DD and self.joy_state.DD:
+            self.pub_palm_land.publish()
+            #rospy.logwarn('Issued PALM_LAND')
 
         if not self.joy_state_prev.X and self.joy_state.X:
             self.pub_flattrim.publish()

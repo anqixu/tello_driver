@@ -15,6 +15,7 @@ import math
 import numpy as np
 import threading
 from tellopy._internal import tello
+from tellopy._internal import error
 from tellopy._internal import protocol
 from tellopy._internal import logger
 
@@ -66,8 +67,15 @@ class TelloNode(tello.Tello):
             tello_ip=self.tello_ip,
             tello_cmd_port=self.tello_cmd_port,
             log=log)
+        rospy.loginfo('Connecting to drone @ %s:%d' % self.tello_addr)
         self.connect()
-        self.wait_for_connection(timeout=self.connect_timeout_sec)
+        try:
+            self.wait_for_connection(timeout=self.connect_timeout_sec)
+        except error.TelloError as err:
+            rospy.logerr(str(err))
+            rospy.signal_shutdown(str(err))
+            self.quit()
+            return
         rospy.loginfo('Connected to drone')
         rospy.on_shutdown(self.cb_shutdown)
 
@@ -85,6 +93,8 @@ class TelloNode(tello.Tello):
         self.sub_throw_takeoff = rospy.Subscriber(
             'throw_takeoff', Empty, self.cb_throw_takeoff)
         self.sub_land = rospy.Subscriber('land', Empty, self.cb_land)
+        self.sub_palm_land = rospy.Subscriber(
+            'palm_land', Empty, self.cb_palm_land)
         self.sub_flattrim = rospy.Subscriber(
             'flattrim', Empty, self.cb_flattrim)
         self.sub_flip = rospy.Subscriber('flip', UInt8, self.cb_flip)
@@ -113,10 +123,14 @@ class TelloNode(tello.Tello):
     def cb_status_telem(self, event, sender, data, **args):
         speed_horizontal_mps = math.sqrt(
             data.north_speed*data.north_speed+data.east_speed*data.east_speed)/10.
+
+        # Anecdotally, observed that:
+        # + easting points to South
+        # + northing points to East
         msg = TelloStatus(
             height_m=data.height/10.,
-            speed_northing_mps=data.north_speed/10.,
-            speed_easting_mps=data.east_speed/10.,
+            speed_northing_mps=-data.east_speed/10.,
+            speed_easting_mps=data.north_speed/10.,
             speed_horizontal_mps=speed_horizontal_mps,
             speed_vertical_mps=-data.vertical_speed/10.,
             flight_time_sec=data.fly_time/10.,
@@ -129,8 +143,8 @@ class TelloNode(tello.Tello):
             wind_state=data.wind_state,
             imu_calibration_state=data.imu_calibration_state,
             battery_percentage=data.battery_percentage,
-            drone_fly_time_left_sec=data.drone_fly_time_left,
-            drone_battery_left_sec=data.drone_battery_left,
+            drone_fly_time_left_sec=data.drone_fly_time_left/10.,
+            drone_battery_left_sec=data.drone_battery_left/10.,
             is_flying=data.em_sky,
             is_on_ground=data.em_ground,
             is_em_open=data.em_open,
@@ -140,13 +154,13 @@ class TelloNode(tello.Tello):
             is_battery_lower=data.battery_lower,
             is_factory_mode=data.factory_mode,
             fly_mode=data.fly_mode,
-            throw_takeoff_timer_sec=data.throw_fly_timer,
+            throw_takeoff_timer_sec=data.throw_fly_timer/10.,
             camera_state=data.camera_state,
             electrical_machinery_state=data.electrical_machinery_state,
             front_in=data.front_in,
             front_out=data.front_out,
             front_lsc=data.front_lsc,
-            temperature_height_m=data.temperature_height,
+            temperature_height_m=data.temperature_height/10.,
         )
         self.pub_status.publish(msg)
 
@@ -180,10 +194,7 @@ class TelloNode(tello.Tello):
         notify_cmd_success('Takeoff', success)
 
     def cb_throw_takeoff(self, msg):
-        THROW_TAKEOFF_CMD = 0x005d
-        pkt = protocol.Packet(THROW_TAKEOFF_CMD, pkt_type=0x48)
-        pkt.fixup()
-        success = self.send_packet(pkt)
+        success = self.throw_takeoff()
         if success:
             rospy.loginfo('Drone set to auto-takeoff when thrown')
         else:
@@ -193,36 +204,34 @@ class TelloNode(tello.Tello):
         success = self.land()
         notify_cmd_success('Land', success)
 
+    def cb_palm_land(self, msg):
+        success = self.palm_land()
+        notify_cmd_success('PalmLand', success)
+
     def cb_flattrim(self, msg):
-        PLANE_CALIBRATION_CMD = 4180
-        pkt = protocol.Packet(PLANE_CALIBRATION_CMD)
-        pkt.fixup()
-        success = self.send_packet(pkt)
+        success = self.flattrim()
         notify_cmd_success('FlatTrim', success)
 
     def cb_flip(self, msg):
-        if msg.data < 0 or msg.data > 7:
+        if msg.data < 0 or msg.data > protocol.FLIP_MAX_INT:
             rospy.logwarn('Invalid flip direction: %d' % msg.data)
             return
-        pkt = protocol.Packet(protocol.FLIP_CMD, 0x70)
-        pkt.add_byte(int(msg.data))
-        pkt.fixup()
-        success = self.send_packet(pkt)
-        notify_cmd_success('Flip', success)
+        success = self.flip(msg.data)
+        notify_cmd_success('Flip %d' % msg.data, success)
 
     # WARNING: need to constantly send gamepad packets, or else props will stop even during takeoff
     def cb_cmd_vel(self, msg):
         self.set_pitch(msg.linear.x)
         self.set_roll(-msg.linear.y)
         self.set_yaw(-msg.angular.z)
-        # NOTE: set_throttle actually controls vertical up/down
-        self.set_throttle(msg.linear.z)
+        self.set_vspeed(msg.linear.z)
 
 
 def main():
     rospy.init_node('tello_node')
     robot = TelloNode()
-    rospy.spin()
+    if robot.state != robot.STATE_QUIT:
+        rospy.spin()
 
 
 if __name__ == '__main__':
