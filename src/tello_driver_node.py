@@ -171,7 +171,11 @@ class TelloNode(tello.Tello):
 
     def framegrabber_loop(self):
         vs = self.get_video_stream()
-        container = av.open(vs)
+        try:
+            container = av.open(vs)
+        except BaseException as err:
+            rospy.logerr(str(err))
+            return
         for frame in container.decode(video=0):  # vs blocks, dies on self.stop
             img = np.array(frame.to_image())
             try:
@@ -225,6 +229,8 @@ class TelloNode(tello.Tello):
         self.set_roll(-msg.linear.y)
         self.set_yaw(-msg.angular.z)
         self.set_vspeed(msg.linear.z)
+        # rospy.loginfo('> %3.1f %3.1f %3.1f %3.1f' %
+        #              (msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.z)) # TODO: remove debug
 
 
 def main():

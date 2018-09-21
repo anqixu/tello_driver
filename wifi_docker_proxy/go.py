@@ -57,7 +57,7 @@ def execute(cmd, exit_on_error=False):
 
 
 def parse_args():
-    task_choices = ['build', 'setup', 'connect', 'stop']
+    task_choices = ['build', 'setup', 'connect', 'bash', 'stop']
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', dest='print_cmds_only',
@@ -126,6 +126,10 @@ def dispatcher():
     elif args.task == 'connect':
         container_name = cfg['Session']['CONTAINER_NAME']
         cmds.append(['docker', 'exec', container_name, '/connect_drone.sh'])
+
+    elif args.task == 'bash':
+        container_name = cfg['Session']['CONTAINER_NAME']
+        cmds.append(['docker', 'exec', '-it', container_name, '/bin/bash'])
 
     elif args.task == 'stop':
         container_name = cfg['Session']['CONTAINER_NAME']

@@ -21,6 +21,4 @@ ENV TERM=xterm
 # Fix Python-3 compatibility (see http://bugs.python.org/issue19846)
 ENV LANG C.UTF-8
 
-#CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
-# TODO: pbly need to re-enable above, and run 2x socat in script, one for telem and one for video
-CMD /usr/bin/socat UDP4-LISTEN:8889,fork UDP4:192.168.10.1:8889,bind=:8890
+CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
