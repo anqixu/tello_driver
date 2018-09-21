@@ -1,0 +1,27 @@
+<launch>
+  <arg name="bag.name" default="/home/mimic/tello"/>
+  <arg name="bag.topics" default="
+/diagnostics
+/joy
+/rosout
+/rosout_agg
+/tello/agent_cmd_vel_in
+/tello/cmd_vel
+/tello/flattrim
+/tello/flip
+/tello/land
+/tello/odom
+/tello/reset
+/tello/status
+/tello/takeoff
+/tello/tello/parameter_descriptions
+/tello/tello/parameter_updates
+/tello/throw_takeoff
+     "/>
+<!--
+Omitted topics:
+/tello/image_raw
+/tello/image_raw/compressed
+-->
+  <node pkg="rosbag" type="record" name="rosbag_record" args="--output-prefix=$(arg bag.name) $(arg bag.topics)" output="screen" />
+</launch>

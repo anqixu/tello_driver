@@ -1,3 +1,4 @@
-tellopy
+-e git://github.com/anqixu/TelloPy.git#egg=tellopy
 av
-python-opencv
+numpy
+# python-opencv # handled by ROS

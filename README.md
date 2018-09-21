@@ -4,4 +4,12 @@ ROS driver wrapper for DJI/Ryze Tello drone
 TODO: Work-in-Progress
 
 ## Installation
-* rosdep install tello_driver
+* `$ cd <CATKIN_WS/SRC>`
+* `$ git clone https://github.com/anqixu/TelloPy.git`
+* `$ cd TelloPy`
+* `$ sudo -H pip2 install -e .`
+* `$ cd ..`
+* `$ git clone https://github.com/anqixu/tello_driver.git`
+* `$ cd ..`
+* `$ rosdep install tello_driver`
+* `$ catkin build tello_driver`
