@@ -54,6 +54,7 @@ def notify_cmd_success(cmd, success):
 
 class TelloNode(tello.Tello):
     def __init__(self):
+        self.client_port = int(rospy.get_param('~client_port', 8890))
         self.tello_ip = rospy.get_param('~tello_ip', '192.168.10.1')
         self.tello_cmd_port = int(rospy.get_param('~tello_cmd_port', 8889))
         self.connect_timeout_sec = float(
@@ -64,6 +65,7 @@ class TelloNode(tello.Tello):
         log = RospyLogger('Tello')
         log.set_level(self.LOG_WARN)
         super(TelloNode, self).__init__(
+            client_port=self.client_port,
             tello_ip=self.tello_ip,
             tello_cmd_port=self.tello_cmd_port,
             log=log)

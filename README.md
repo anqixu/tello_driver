@@ -14,9 +14,10 @@ Topics:
 * `~flip`: [std_msgs/Uint8](http://docs.ros.org/api/std_msgs/html/msg/UInt8.html)
 
 Parameters:
-* `tello_ip`
-* `tello_cmd_port`
-* `connect_timeout_sec`
+* `~tello_ip`
+* `~tello_cmd_port`
+* `~client_port`
+* `~connect_timeout_sec`
 
 ## Installation
 * `$ cd <CATKIN_WS/SRC>`
@@ -33,7 +34,7 @@ Parameters:
 
 * turn on drone and wait for its front lights to blink amber
 * connect WiFi to drone's access point (e.g. `TELLO_######`)
-* `$ roslaunch tello_driver [launch/tello_node.launch](launch/tello_node.launch)`
+* `$ roslaunch tello_driver launch/tello_node.launch`
 
 To see the camera:
 * `$ rosrun rqt_image_view rqt_image_view /tello/image_raw/compressed`
