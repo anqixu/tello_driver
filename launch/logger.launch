@@ -1,5 +1,5 @@
 <launch>
-  <arg name="bag.name" default="/home/mimic/tello"/>
+  <arg name="bag.name" default="$(env HOME)/tello"/>
   <arg name="bag.topics" default="
 /diagnostics
 /joy

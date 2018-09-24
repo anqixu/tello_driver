@@ -30,6 +30,9 @@ Parameters:
 * `$ rosdep install tello_driver`
 * `$ catkin build tello_driver`
 
+Optionally, install the [following udev rules](https://github.com/anqixu/sixad_rumble/blob/master/misc/10-gamepads.rules) for PS3 gamepads; see instructions in comments on top of file.
+
+
 ## Running the driver
 
 * turn on drone and wait for its front lights to blink amber

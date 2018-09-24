@@ -1,16 +1,17 @@
 <?xml version="1.0"?>
 <launch>
     <arg name="tello_ip" default="192.168.10.1" />
-    <!-- arg name="tello_ip" default="172.17.0.2" / -->
-    <arg name="tello_cmd_port" default="8889" />
-    <arg name="client_port" default="8890" />
+    <arg name="tello_cmd_server_port" default="8889" />
+    <arg name="local_cmd_client_port" default="8890" />
+    <arg name="local_vid_server_port" default="6038" />
     <arg name="namespace" default="tello" />
 
     <group ns="$(arg namespace)">
         <node pkg="tello_driver" name="tello" type="tello_driver_node.py" output="screen">
-            <param name="client_port" value="$(arg client_port)" />
+            <param name="local_cmd_client_port" value="$(arg local_cmd_client_port)" />
+            <param name="local_vid_server_port" value="$(arg local_vid_server_port)" />
             <param name="tello_ip" value="$(arg tello_ip)" />
-            <param name="tello_cmd_port" value="$(arg tello_cmd_port)" />
+            <param name="tello_cmd_server_port" value="$(arg tello_cmd_server_port)" />
             <param name="connect_timeout_sec" value="10.0" />
         </node>
 

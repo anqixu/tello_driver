@@ -77,6 +77,14 @@ def parse_args():
                         help='Drone\'s access point name '
                         '[retrieved from config.ini]',
                         type=str, default='')
+    parser.add_argument('--local_cmd_client_port', dest='LOCAL_CMD_CLIENT_PORT',
+                        help='Local port bound to Drone\'s command server '
+                        '[retrieved from config.ini]',
+                        type=str, default='')
+    parser.add_argument('--local_vid_server_port', dest='LOCAL_VID_SERVER_PORT',
+                        help='Local port for video stream server from Drone '
+                        '[retrieved from config.ini]',
+                        type=str, default='')
     args = parser.parse_args()
     return args, parser
 
@@ -84,7 +92,8 @@ def parse_args():
 def merge_args(cfg, args):
     if 'Session' not in cfg:
         cfg['Session'] = {}
-    for key in ['CONTAINER_NAME', 'WIFI_DEV', 'DRONE_AP']:
+    for key in ('CONTAINER_NAME', 'WIFI_DEV', 'DRONE_AP',
+                'LOCAL_CMD_CLIENT_PORT', 'LOCAL_VID_SERVER_PORT'):
         if not hasattr(args, key):
             continue
         val = getattr(args, key)
@@ -114,11 +123,15 @@ def dispatcher():
         container_name = cfg['Session']['CONTAINER_NAME']
         wifi_dev = cfg['Session']['WIFI_DEV']
         drone_ap = cfg['Session']['DRONE_AP']
+        local_cmd_client_port = cfg['Session']['LOCAL_CMD_CLIENT_PORT']
+        local_vid_server_port = cfg['Session']['LOCAL_VID_SERVER_PORT']
 
         cmds.append(['docker', 'run',
                      '-d', '--rm', '--privileged',
                      '--env', 'DRONE_AP='+drone_ap,
                      '--env', 'WIFI_DEV='+wifi_dev,
+                     '--env', 'LOCAL_CMD_CLIENT_PORT='+local_cmd_client_port,
+                     '--env', 'LOCAL_VID_SERVER_PORT='+local_vid_server_port,
                      '--name', container_name,
                      image_name])
         cmds.append(['./setup_network.sh', container_name, wifi_dev])

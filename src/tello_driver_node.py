@@ -54,9 +54,13 @@ def notify_cmd_success(cmd, success):
 
 class TelloNode(tello.Tello):
     def __init__(self):
-        self.client_port = int(rospy.get_param('~client_port', 8890))
+        self.local_cmd_client_port = int(
+            rospy.get_param('~local_cmd_client_port', 8890))
+        self.local_vid_server_port = int(
+            rospy.get_param('~local_vid_server_port', 6038))
         self.tello_ip = rospy.get_param('~tello_ip', '192.168.10.1')
-        self.tello_cmd_port = int(rospy.get_param('~tello_cmd_port', 8889))
+        self.tello_cmd_server_port = int(
+            rospy.get_param('~tello_cmd_server_port', 8889))
         self.connect_timeout_sec = float(
             rospy.get_param('~connect_timeout_sec', 10.0))
         self.bridge = CvBridge()
@@ -65,9 +69,10 @@ class TelloNode(tello.Tello):
         log = RospyLogger('Tello')
         log.set_level(self.LOG_WARN)
         super(TelloNode, self).__init__(
-            client_port=self.client_port,
+            local_cmd_client_port=self.local_cmd_client_port,
+            local_vid_server_port=self.local_vid_server_port,
             tello_ip=self.tello_ip,
-            tello_cmd_port=self.tello_cmd_port,
+            tello_cmd_server_port=self.tello_cmd_server_port,
             log=log)
         rospy.loginfo('Connecting to drone @ %s:%d' % self.tello_addr)
         self.connect()

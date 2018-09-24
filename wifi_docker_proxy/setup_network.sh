@@ -19,7 +19,16 @@ for path in /var/run/netns/*; do if [ -L "$path" ] && ! [ -e "$path" ]; then sud
 sudo ln -s /proc/$PID/ns/net /var/run/netns/$PID
 
 # Assign physical device for wifi dongle to container's network namespace
-PHYID=phy$(iw dev | grep -B 1 $WIFI_DEV | pcregrep -o1 'phy\#([0-9]+)')
-sudo iw phy $PHYID set netns $PID
+#PHYID=phy$(iw dev | grep -B 1 $WIFI_DEV | pcregrep -o1 'phy\#([0-9]+)') # doesn't work in all cases
+PHYID=$(./get_phyid.py $WIFI_DEV)
+if [ -z "$PHYID" ]
+then
+    echo "! could not find physical device for $WIFI_DEV"
+    iw dev
+    exit 1
+else
+    sudo iw phy $PHYID set netns $PID
+    echo "- SUCCESS! Wifi device $WIFI_DEV ($PHYID) now accessible by container $CONTAINER_NAME"
+fi
 
 # From now on, assuming the container is '--privileged', it will be able to interact with the wifi dongle
