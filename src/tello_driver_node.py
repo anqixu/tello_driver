@@ -197,6 +197,13 @@ class TelloNode(tello.Tello):
         if self.cfg is None:
             self.cfg = config
             update_all = True
+
+        if update_all or self.cfg.fixed_video_rate != config.fixed_video_rate:
+            self.set_video_encoder_rate(config.fixed_video_rate)
+            self.cfg.fixed_video_rate = None  # Also __send_req_video_sps_pps()
+        if update_all or self.cfg.fixed_video_rate != config.fixed_video_rate:
+            self.__send_req_video_sps_pps()
+
         self.cfg = config
         return self.cfg
 
@@ -236,8 +243,6 @@ class TelloNode(tello.Tello):
         self.set_roll(-msg.linear.y)
         self.set_yaw(-msg.angular.z)
         self.set_vspeed(msg.linear.z)
-        # rospy.loginfo('> %3.1f %3.1f %3.1f %3.1f' %
-        #              (msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.z)) # TODO: remove debug
 
 
 def main():
