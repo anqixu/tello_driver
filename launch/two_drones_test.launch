@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="joy_dev" default="/dev/input/gamepads/js_dft" />
+
+    <node pkg="joy" type="joy_node" name="joy_node">
+        <param name="dev" value="$(arg joy_dev)" />
+        <param name="deadzone" value="0.2" />
+    </node>
+
+    <group ns="tello1">
+        <node pkg="tello_driver" type="gamepad_marshall_node.py" name="joy_teleop" />
+    </group>
+
+    <include file="$(find tello_driver)/launch/tello_node.launch">
+        <arg name="namespace" value="tello1" />
+        <arg name="tello_ip" value="172.17.0.2" />
+        <arg name="local_cmd_client_port" value="8890" />
+        <arg name="local_vid_server_port" value="6038" />
+    </include>
+
+    <include file="$(find tello_driver)/launch/tello_node.launch">
+        <arg name="namespace" value="tello2" />
+        <arg name="tello_ip" value="172.17.0.3" />
+        <arg name="local_cmd_client_port" value="9890" />
+        <arg name="local_vid_server_port" value="7038" />
+    </include>
+</launch>
