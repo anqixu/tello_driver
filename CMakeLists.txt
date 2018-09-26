@@ -8,6 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   dynamic_reconfigure
   geometry_msgs
+  h264_image_transport
+  image_transport
   message_generation
   nav_msgs
   rospy
@@ -41,7 +43,7 @@ generate_dynamic_reconfigure_options(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS cv_bridge dynamic_reconfigure geometry_msgs message_runtime nav_msgs rospy sensor_msgs std_msgs
+  CATKIN_DEPENDS cv_bridge dynamic_reconfigure geometry_msgs h264_image_transport image_transport message_runtime nav_msgs rospy sensor_msgs std_msgs
 #  DEPENDS system_lib
 )
 
@@ -53,6 +55,14 @@ include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
 )
+
+#find_package(OpenCV 3.0 REQUIRED COMPONENTS core imgproc highgui imgcodecs)
+#include_directories(
+#  ${catkin_INCLUDE_DIRS}
+#  ${OpenCV_INCLUDE_DIRS}
+#)
+#add_executable(test_h264_sub src/test_h264_sub.cpp)
+#target_link_libraries(test_h264_sub ${catkin_LIBRARIES} ${OpenCV_LIBS})
 
 #############
 ## Install ##

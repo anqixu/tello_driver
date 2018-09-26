@@ -25,8 +25,10 @@ Parameters:
 * `$ cd TelloPy`
 * `$ sudo -H pip2 install -e .`
 * `$ cd ..`
+* `$ git clone https://github.com/anqixu/h264_image_transport.git`
 * `$ git clone https://github.com/anqixu/tello_driver.git`
 * `$ cd ..`
+* `$ rosdep install h264_image_transport`
 * `$ rosdep install tello_driver`
 * `$ catkin build tello_driver`
 

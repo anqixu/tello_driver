@@ -1,4 +1,4 @@
--e git://github.com/anqixu/TelloPy.git#egg=tellopy
+# -e git://github.com/anqixu/TelloPy.git#egg=tellopy # assume installed manually
+# python-opencv # handled by ROS
 av
 numpy
-# python-opencv # handled by ROS

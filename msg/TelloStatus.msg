@@ -42,4 +42,10 @@ bool front_in
 bool front_out
 bool front_lsc
 
-uint8 temperature_height_m
+float32 temperature_height_m
+
+float32 cmd_roll_ratio
+float32 cmd_pitch_ratio
+float32 cmd_yaw_ratio
+float32 cmd_vspeed_ratio
+bool cmd_fast_mode

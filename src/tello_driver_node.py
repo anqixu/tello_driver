@@ -6,6 +6,7 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from dynamic_reconfigure.server import Server
+from h264_image_transport.msg import H264Packet
 from tello_driver.msg import TelloStatus
 from tello_driver.cfg import TelloConfig
 from cv_bridge import CvBridge, CvBridgeError
@@ -63,7 +64,10 @@ class TelloNode(tello.Tello):
             rospy.get_param('~tello_cmd_server_port', 8889))
         self.connect_timeout_sec = float(
             rospy.get_param('~connect_timeout_sec', 10.0))
+        self.stream_h264_video = bool(
+            rospy.get_param('~stream_h264_video', False))
         self.bridge = CvBridge()
+        self.frame_thread = None
 
         # Connect to drone
         log = RospyLogger('Tello')
@@ -94,7 +98,12 @@ class TelloNode(tello.Tello):
         # NOTE: ROS interface deliberately made to resemble bebop_autonomy
         self.pub_status = rospy.Publisher(
             'status', TelloStatus, queue_size=1, latch=True)
-        self.pub_image_raw = rospy.Publisher('image_raw', Image, queue_size=10)
+        if self.stream_h264_video:
+            self.pub_image_h264 = rospy.Publisher(
+                'image_raw/h264', H264Packet, queue_size=10)
+        else:
+            self.pub_image_raw = rospy.Publisher(
+                'image_raw', Image, queue_size=10)
 
         self.sub_takeoff = rospy.Subscriber('takeoff', Empty, self.cb_takeoff)
         self.sub_throw_takeoff = rospy.Subscriber(
@@ -106,10 +115,16 @@ class TelloNode(tello.Tello):
             'flattrim', Empty, self.cb_flattrim)
         self.sub_flip = rospy.Subscriber('flip', UInt8, self.cb_flip)
         self.sub_cmd_vel = rospy.Subscriber('cmd_vel', Twist, self.cb_cmd_vel)
+        self.sub_fast_mode = rospy.Subscriber(
+            'fast_mode', Bool, self.cb_fast_mode)
 
         self.subscribe(self.EVENT_FLIGHT_DATA, self.cb_status_telem)
-        self.frame_thread = threading.Thread(target=self.framegrabber_loop)
-        self.frame_thread.start()
+        if self.stream_h264_video:
+            self.start_video()
+            self.subscribe(self.EVENT_VIDEO_FRAME, self.cb_h264_frame)
+        else:
+            self.frame_thread = threading.Thread(target=self.framegrabber_loop)
+            self.frame_thread.start()
 
         # NOTE: odometry from parsing logs might be possible eventually,
         #       but it is unclear from tests what's being sent by Tello
@@ -125,13 +140,14 @@ class TelloNode(tello.Tello):
 
     def cb_shutdown(self):
         self.quit()
-        self.frame_thread.join()
+        if self.frame_thread is not None:
+            self.frame_thread.join()
 
     def cb_status_telem(self, event, sender, data, **args):
         speed_horizontal_mps = math.sqrt(
             data.north_speed*data.north_speed+data.east_speed*data.east_speed)/10.
 
-        # NOTE: Anecdotally, observed that:
+        # TODO: verify outdoors: anecdotally, observed that:
         # data.east_speed points to South
         # data.north_speed points to East
         msg = TelloStatus(
@@ -168,6 +184,11 @@ class TelloNode(tello.Tello):
             front_out=data.front_out,
             front_lsc=data.front_lsc,
             temperature_height_m=data.temperature_height/10.,
+            cmd_roll_ratio=self.right_x,
+            cmd_pitch_ratio=self.right_y,
+            cmd_yaw_ratio=self.left_x,
+            cmd_vspeed_ratio=self.left_y,
+            cmd_fast_mode=self.fast_mode,
         )
         self.pub_status.publish(msg)
 
@@ -175,6 +196,15 @@ class TelloNode(tello.Tello):
         odom_msg = UInt8MultiArray()
         odom_msg.data = str(data)
         self.pub_odom.publish(odom_msg)
+
+    def cb_h264_frame(self, event, sender, data, **args):
+        frame, seq_id, frame_secs = data
+        pkt_msg = H264Packet()
+        pkt_msg.header.seq = seq_id
+        pkt_msg.header.frame_id = 'tello'  # TODO: change to namespace or node name
+        pkt_msg.header.stamp = rospy.Time.from_sec(frame_secs)
+        pkt_msg.data = frame
+        self.pub_image_h264.publish(pkt_msg)
 
     def framegrabber_loop(self):
         vs = self.get_video_stream()
@@ -186,11 +216,12 @@ class TelloNode(tello.Tello):
         for frame in container.decode(video=0):  # vs blocks, dies on self.stop
             img = np.array(frame.to_image())
             try:
-                msg = self.bridge.cv2_to_imgmsg(img, 'rgb8')
+                img_msg = self.bridge.cv2_to_imgmsg(img, 'rgb8')
+                img_msg.header.frame_id = 'tello'  # TODO: change to namespace or node name
             except CvBridgeError as e:
                 rospy.logerr(str(e))
                 continue
-            self.pub_image_raw.publish(msg)
+            self.pub_image_raw.publish(img_msg)
 
     def cb_dyncfg(self, config, level):
         update_all = False
@@ -200,9 +231,9 @@ class TelloNode(tello.Tello):
 
         if update_all or self.cfg.fixed_video_rate != config.fixed_video_rate:
             self.set_video_encoder_rate(config.fixed_video_rate)
-            self.cfg.fixed_video_rate = None  # Also __send_req_video_sps_pps()
+            self.cfg.fixed_video_rate = None  # Also send_req_video_sps_pps()
         if update_all or self.cfg.fixed_video_rate != config.fixed_video_rate:
-            self.__send_req_video_sps_pps()
+            self.send_req_video_sps_pps()
 
         self.cfg = config
         return self.cfg
@@ -237,12 +268,14 @@ class TelloNode(tello.Tello):
         success = self.flip(msg.data)
         notify_cmd_success('Flip %d' % msg.data, success)
 
-    # WARNING: need to constantly send gamepad packets, or else props will stop even during takeoff
     def cb_cmd_vel(self, msg):
         self.set_pitch(msg.linear.x)
         self.set_roll(-msg.linear.y)
         self.set_yaw(-msg.angular.z)
         self.set_vspeed(msg.linear.z)
+
+    def cb_fast_mode(self, msg):
+        self.set_fast_mode(msg.data)
 
 
 def main():
