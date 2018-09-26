@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 import rospy
-from std_msgs.msg import Empty, UInt8
+from std_msgs.msg import Empty, UInt8, Bool
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
 
@@ -133,6 +133,8 @@ class GamepadMarshallNode:
             'flip', UInt8,  queue_size=1, latch=False)
         self.pub_cmd_out = rospy.Publisher(
             'cmd_vel', Twist, queue_size=10, latch=False)
+        self.pub_fast_mode = rospy.Publisher(
+            'fast_mode', Bool,  queue_size=1, latch=False)
         self.sub_agent_cmd_in = rospy.Subscriber(
             'agent_cmd_vel_in', Twist, self.agent_cmd_cb)
         self.sub_joy = rospy.Subscriber('/joy', Joy, self.joy_cb)
@@ -188,13 +190,18 @@ class GamepadMarshallNode:
                 self.flip_dir = 0
 
         # Update agent bypass mode
-        if self.joy_state.LT:
+        if self.joy_state.L2:
             self.agent_mode_t = rospy.Time.now()
         else:
             self.agent_mode_t = None
 
         # Manual control mode
         if self.agent_mode_t is None:
+            if not self.joy_state_prev.R2 and self.joy_state.R2:
+                self.pub_fast_mode.publish(True)
+            elif self.joy_state_prev.R2 and not self.joy_state.R2:
+                self.pub_fast_mode.publish(False)
+
             cmd = Twist()
             cmd.linear.x = self.joy_state.LY
             cmd.linear.y = self.joy_state.LX

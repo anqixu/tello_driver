@@ -15,6 +15,7 @@ import av
 import math
 import numpy as np
 import threading
+import time
 from tellopy._internal import tello
 from tellopy._internal import error
 from tellopy._internal import protocol
@@ -201,38 +202,54 @@ class TelloNode(tello.Tello):
         frame, seq_id, frame_secs = data
         pkt_msg = H264Packet()
         pkt_msg.header.seq = seq_id
-        pkt_msg.header.frame_id = 'tello'  # TODO: change to namespace or node name
+        pkt_msg.header.frame_id = rospy.get_namespace()
         pkt_msg.header.stamp = rospy.Time.from_sec(frame_secs)
         pkt_msg.data = frame
         self.pub_image_h264.publish(pkt_msg)
 
     def framegrabber_loop(self):
+        # Repeatedly try to connect
         vs = self.get_video_stream()
-        try:
-            container = av.open(vs)
-        except BaseException as err:
-            rospy.logerr(str(err))
-            return
-        for frame in container.decode(video=0):  # vs blocks, dies on self.stop
-            img = np.array(frame.to_image())
+        while self.state != self.STATE_QUIT:
             try:
-                img_msg = self.bridge.cv2_to_imgmsg(img, 'rgb8')
-                img_msg.header.frame_id = 'tello'  # TODO: change to namespace or node name
-            except CvBridgeError as e:
-                rospy.logerr(str(e))
-                continue
-            self.pub_image_raw.publish(img_msg)
+                container = av.open(vs)
+                break
+            except BaseException as err:
+                rospy.logerr('fgrab: pyav stream failed - %s' % str(err))
+                time.sleep(1.0)
+
+        # Once connected, process frames till drone/stream closes
+        while self.state != self.STATE_QUIT:
+            try:
+                # vs blocks, dies on self.stop
+                for frame in container.decode(video=0):
+                    img = np.array(frame.to_image())
+                    try:
+                        img_msg = self.bridge.cv2_to_imgmsg(img, 'rgb8')
+                        img_msg.header.frame_id = rospy.get_namespace()
+                    except CvBridgeError as err:
+                        rospy.logerr('fgrab: cv bridge failed - %s' % str(err))
+                        continue
+                    self.pub_image_raw.publish(img_msg)
+                break
+            except BaseException as err:
+                rospy.logerr('fgrab: pyav decoder failed - %s' % str(err))
 
     def cb_dyncfg(self, config, level):
         update_all = False
+        req_sps_pps = False
         if self.cfg is None:
             self.cfg = config
             update_all = True
 
         if update_all or self.cfg.fixed_video_rate != config.fixed_video_rate:
             self.set_video_encoder_rate(config.fixed_video_rate)
-            self.cfg.fixed_video_rate = None  # Also send_req_video_sps_pps()
-        if update_all or self.cfg.fixed_video_rate != config.fixed_video_rate:
+            req_sps_pps = True
+        if update_all or self.cfg.video_req_sps_hz != config.video_req_sps_hz:
+            self.set_video_req_sps_hz(config.video_req_sps_hz)
+            req_sps_pps = True
+
+        if req_sps_pps:
             self.send_req_video_sps_pps()
 
         self.cfg = config
