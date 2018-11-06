@@ -1,5 +1,6 @@
 # tello_driver
-**WORK-IN-PROGRESS**
+
+**DISCLAIMER: This package is an work-in-progress. I take no responsibility for any consequences of you using this software. The documentation might be broken, and features and API are considered VOLATILE presently.**
 
 ROS driver wrapper for DJI/Ryze Tello drone
 
@@ -32,7 +33,7 @@ Parameters:
 * `$ git clone https://github.com/anqixu/tello_driver.git`
 * `$ cd ..`
 * `$ rosdep install h264_image_transport`
-* `$ rosdep install tello_driver`
+* skip this step: `$ # rosdep install tello_driver # not working currently`
 * `$ catkin build tello_driver`
 
 Optionally, install the [following udev rules](https://github.com/anqixu/sixad_rumble/blob/master/misc/10-gamepads.rules) for PS3 gamepads; see instructions in comments on top of file.
