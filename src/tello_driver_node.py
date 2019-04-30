@@ -213,6 +213,7 @@ class TelloNode(tello.Tello):
         while self.state != self.STATE_QUIT:
             try:
                 container = av.open(vs)
+                rospy.loginfo('Connected to video stream')  # TODO: remove
                 break
             except BaseException as err:
                 rospy.logerr('fgrab: pyav stream failed - %s' % str(err))

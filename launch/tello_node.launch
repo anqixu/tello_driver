@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
     <arg name="tello_ip" default="192.168.10.1" />
+    <!-- arg name="tello_ip" default="172.17.0.2" /-->
     <arg name="tello_cmd_server_port" default="8889" />
     <arg name="local_cmd_client_port" default="8890" />
     <arg name="local_vid_server_port" default="6038" />
